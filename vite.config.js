@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: './',
+  base: '/connect4/',
   build: {
     outDir: 'docs'
   }
 })
-
