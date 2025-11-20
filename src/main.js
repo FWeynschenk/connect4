@@ -11,18 +11,28 @@ const app = {
     findMatchBtn: document.getElementById('find-match-btn'),
     lobbyStatus: document.getElementById('lobby-status'),
     gameBoard: document.getElementById('game-board'),
-    restartBtn: document.getElementById('restart-btn'),
+    surrenderBtn: document.getElementById('surrender-btn'),
     lobbyControls: document.getElementById('lobby-controls'),
+    modal: document.getElementById('game-modal'),
+    modalTitle: document.getElementById('modal-title'),
+    modalMessage: document.getElementById('modal-message'),
+    modalRematchBtn: document.getElementById('modal-rematch-btn'),
+    modalQuitBtn: document.getElementById('modal-quit-btn'),
   },
   state: {
     inGame: false,
     isMyTurn: false,
     myPlayerId: null, // 1 or 2
+    startingPlayer: 1, // 1 starts by default
+    localRematch: false,
+    remoteRematch: false,
   },
 
   init() {
     this.elements.findMatchBtn.addEventListener('click', () => this.findMatch());
-    this.elements.restartBtn.addEventListener('click', () => this.requestRestart());
+    this.elements.surrenderBtn.addEventListener('click', () => this.surrender());
+    this.elements.modalRematchBtn.addEventListener('click', () => this.handleRematchClick());
+    this.elements.modalQuitBtn.addEventListener('click', () => this.handleQuitClick());
     this.renderBoard();
 
     this.elements.status.textContent = "Welcome! Find a match to play.";
@@ -41,12 +51,14 @@ const app = {
   startGame(isHost) {
     this.state.inGame = true;
     this.state.myPlayerId = isHost ? 1 : 2;
-    this.state.isMyTurn = isHost; // Player 1 starts
+    this.state.startingPlayer = 1;
+    this.state.isMyTurn = this.state.myPlayerId === this.state.startingPlayer;
 
     this.elements.lobbyControls.classList.add('hidden');
     this.elements.gameBoard.classList.remove('hidden');
-    this.elements.restartBtn.classList.remove('hidden');
+    this.elements.surrenderBtn.classList.remove('hidden');
 
+    this.resetRematchState();
     this.updateStatus();
 
     // Setup network listeners
@@ -54,22 +66,51 @@ const app = {
       this.handleRemoteMove(data.col);
     });
 
-    network.onRestartReceived(() => {
-      this.resetGame();
+    network.onSurrenderReceived(() => {
+      this.handleSurrenderReceived();
+    });
+
+    network.onRematchReceived(() => {
+      this.handleRematchReceived();
+    });
+
+    network.onQuitReceived(() => {
+      this.handleQuitReceived();
     });
 
     network.onPeerDisconnect(() => {
-      alert("Opponent disconnected!");
-      location.reload();
+      this.handlePeerDisconnect();
     });
+  },
+
+  handlePeerDisconnect() {
+    this.state.inGame = false;
+    network.leaveGameRoom();
+    this.closeModal();
+    
+    this.elements.gameBoard.classList.add('hidden');
+    this.elements.surrenderBtn.classList.add('hidden');
+    this.elements.lobbyControls.classList.remove('hidden');
+    this.elements.findMatchBtn.classList.remove('hidden');
+    this.elements.lobbyStatus.classList.add('hidden');
+    
+    this.elements.status.textContent = "Opponent disconnected. Returned to lobby.";
+    this.elements.status.style.color = 'var(--text-color)';
+    
+    // Reset board for next game visual hygiene
+    this.resetBoardUI();
+    game.reset();
   },
 
   updateStatus() {
     if (game.winner) {
-      if (game.winner === this.state.myPlayerId) {
+      const won = game.winner === this.state.myPlayerId;
+      if (won) {
         this.elements.status.textContent = "You Won! 🎉";
+        this.showModal("You Won!", "Congratulations! You won the game.");
       } else {
         this.elements.status.textContent = "You Lost 😔";
+        this.showModal("You Lost", "Better luck next time.");
       }
       return;
     }
@@ -119,8 +160,6 @@ const app = {
   },
 
   updateBoardUI(row, col, player) {
-    // The grid is flat in DOM, but we can calculate index: row * cols + col
-    // Wait, CSS grid fills row by row? Yes.
     const index = row * game.cols + col;
     const cell = this.elements.gameBoard.children[index];
     if (cell) {
@@ -128,21 +167,98 @@ const app = {
     }
   },
 
-  requestRestart() {
-    network.sendRestart();
-    this.resetGame();
+  surrender() {
+    if (!this.state.inGame || game.winner) return;
+    network.sendSurrender();
+    this.state.inGame = false;
+    this.showModal("You Resigned", "You surrendered the game.");
+    this.elements.status.textContent = "You Resigned";
   },
 
-  resetGame() {
-    game.reset();
-    // Clear board UI
+  handleSurrenderReceived() {
+    if (!this.state.inGame || game.winner) return;
+    this.state.inGame = false;
+    this.showModal("Opponent Resigned", "You won! The opponent resigned.");
+    this.elements.status.textContent = "Opponent Resigned";
+  },
+
+  showModal(title, message) {
+      this.elements.modalTitle.textContent = title;
+      this.elements.modalMessage.textContent = message;
+      this.elements.modal.classList.remove('hidden');
+      
+      // Reset modal buttons state
+      this.elements.modalRematchBtn.disabled = false;
+      this.elements.modalRematchBtn.textContent = "Rematch";
+  },
+
+  closeModal() {
+      this.elements.modal.classList.add('hidden');
+  },
+
+  handleRematchClick() {
+      this.state.localRematch = true;
+      this.elements.modalRematchBtn.disabled = true;
+      this.elements.modalRematchBtn.textContent = "Waiting...";
+      network.sendRematch();
+      this.checkRematch();
+  },
+
+  handleRematchReceived() {
+      this.state.remoteRematch = true;
+      if (!this.state.localRematch && !this.elements.modal.classList.contains('hidden')) {
+         // Optionally indicate opponent wants rematch
+         this.elements.modalMessage.textContent += " (Opponent wants a rematch!)";
+      }
+      this.checkRematch();
+  },
+
+  checkRematch() {
+      if (this.state.localRematch && this.state.remoteRematch) {
+          // Small delay to let UI update
+          setTimeout(() => this.restartGame(), 500);
+      }
+  },
+
+  restartGame() {
+      this.closeModal();
+      this.resetRematchState();
+      
+      // Reverse turn order
+      this.state.startingPlayer = this.state.startingPlayer === 1 ? 2 : 1;
+      
+      game.reset();
+      this.resetBoardUI();
+      
+      this.state.inGame = true;
+      this.state.isMyTurn = this.state.myPlayerId === this.state.startingPlayer;
+      this.updateStatus();
+  },
+
+  handleQuitClick() {
+      network.sendQuit();
+      this.returnToLobby();
+  },
+  
+  handleQuitReceived() {
+      this.elements.modalRematchBtn.disabled = true;
+      this.elements.modalRematchBtn.textContent = "Opponent Left";
+      this.elements.modalMessage.textContent = "Opponent has left the game.";
+  },
+  
+  returnToLobby() {
+      this.handlePeerDisconnect();
+  },
+
+  resetRematchState() {
+      this.state.localRematch = false;
+      this.state.remoteRematch = false;
+  },
+
+  resetBoardUI() {
     Array.from(this.elements.gameBoard.children).forEach(cell => {
       cell.classList.remove('player1', 'player2');
     });
-
-    // Reset turn logic
-    this.state.isMyTurn = this.state.myPlayerId === 1;
-    this.updateStatus();
   }
 };
 

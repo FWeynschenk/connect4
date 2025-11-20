@@ -5,8 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Connect 4 WebRTC</title>
-    <script type="module" crossorigin src="/connect4/assets/index-CYBNzymb.js"></script>
-    <link rel="stylesheet" crossorigin href="/connect4/assets/index-Dahq4Bmp.css">
+    <script type="module" crossorigin src="/connect4/assets/index-877orx78.js"></script>
+    <link rel="stylesheet" crossorigin href="/connect4/assets/index-BNsX1tI3.css">
   </head>
   <body>
     <div id="app">
@@ -27,8 +27,20 @@
       </main>
 
       <footer>
-        <button id="restart-btn" class="btn secondary hidden">Restart Game</button>
+        <button id="surrender-btn" class="btn danger hidden">Surrender</button>
       </footer>
+
+      <!-- Modal -->
+      <div id="game-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2 id="modal-title">Game Over</h2>
+          <p id="modal-message">You Won!</p>
+          <div class="modal-actions">
+            <button id="modal-rematch-btn" class="btn primary">Rematch</button>
+            <button id="modal-quit-btn" class="btn secondary">Quit</button>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>

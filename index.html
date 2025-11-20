@@ -26,8 +26,20 @@
       </main>
 
       <footer>
-        <button id="restart-btn" class="btn secondary hidden">Restart Game</button>
+        <button id="surrender-btn" class="btn danger hidden">Surrender</button>
       </footer>
+
+      <!-- Modal -->
+      <div id="game-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2 id="modal-title">Game Over</h2>
+          <p id="modal-message">You Won!</p>
+          <div class="modal-actions">
+            <button id="modal-rematch-btn" class="btn primary">Rematch</button>
+            <button id="modal-quit-btn" class="btn secondary">Quit</button>
+          </div>
+        </div>
+      </div>
     </div>
     <script type="module" src="./src/main.js"></script>
   </body>

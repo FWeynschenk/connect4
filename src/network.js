@@ -7,6 +7,9 @@ export class NetworkManager {
         this.onMatchFoundCallback = null;
         this.onMoveReceivedCallback = null;
         this.onPeerDisconnectCallback = null;
+        this.onSurrenderReceivedCallback = null;
+        this.onRematchReceivedCallback = null;
+        this.onQuitReceivedCallback = null;
         this.isHost = false;
         this.peerId = null;
         this.matchmakingId = null;
@@ -68,17 +71,29 @@ export class NetworkManager {
         this.gameRoom = joinRoom(config, roomId);
 
         const [sendMove, getMove] = this.gameRoom.makeAction('move');
-        const [sendRestart, getRestart] = this.gameRoom.makeAction('restart');
+        const [sendSurrender, getSurrender] = this.gameRoom.makeAction('surrender');
+        const [sendRematch, getRematch] = this.gameRoom.makeAction('rematch');
+        const [sendQuit, getQuit] = this.gameRoom.makeAction('quit');
 
         this.sendMoveAction = sendMove;
-        this.sendRestartAction = sendRestart;
+        this.sendSurrenderAction = sendSurrender;
+        this.sendRematchAction = sendRematch;
+        this.sendQuitAction = sendQuit;
 
         getMove((data, peerId) => {
             if (this.onMoveReceivedCallback) this.onMoveReceivedCallback(data);
         });
 
-        getRestart((data, peerId) => {
-            if (this.onRestartReceivedCallback) this.onRestartReceivedCallback();
+        getSurrender((data, peerId) => {
+            if (this.onSurrenderReceivedCallback) this.onSurrenderReceivedCallback();
+        });
+
+        getRematch((data, peerId) => {
+            if (this.onRematchReceivedCallback) this.onRematchReceivedCallback();
+        });
+
+        getQuit((data, peerId) => {
+            if (this.onQuitReceivedCallback) this.onQuitReceivedCallback();
         });
 
         this.gameRoom.onPeerLeave(peerId => {
@@ -92,9 +107,21 @@ export class NetworkManager {
         }
     }
 
-    sendRestart() {
-        if (this.sendRestartAction) {
-            this.sendRestartAction({});
+    sendSurrender() {
+        if (this.sendSurrenderAction) {
+            this.sendSurrenderAction({});
+        }
+    }
+
+    sendRematch() {
+        if (this.sendRematchAction) {
+            this.sendRematchAction({});
+        }
+    }
+
+    sendQuit() {
+        if (this.sendQuitAction) {
+            this.sendQuitAction({});
         }
     }
 
@@ -102,11 +129,26 @@ export class NetworkManager {
         this.onMoveReceivedCallback = callback;
     }
 
-    onRestartReceived(callback) {
-        this.onRestartReceivedCallback = callback;
+    onSurrenderReceived(callback) {
+        this.onSurrenderReceivedCallback = callback;
+    }
+
+    onRematchReceived(callback) {
+        this.onRematchReceivedCallback = callback;
+    }
+
+    onQuitReceived(callback) {
+        this.onQuitReceivedCallback = callback;
     }
 
     onPeerDisconnect(callback) {
         this.onPeerDisconnectCallback = callback;
+    }
+
+    leaveGameRoom() {
+        if (this.gameRoom) {
+            this.gameRoom.leave();
+            this.gameRoom = null;
+        }
     }
 }
